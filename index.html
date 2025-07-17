@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Veintiuno</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f8ff;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #2e8b57;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .cards-container {
+            display: flex;
+            justify-content: space-around;
+            margin: 30px 0;
+        }
+        .hand {
+            min-height: 150px;
+        }
+        .card {
+            display: inline-block;
+            width: 70px;
+            height: 100px;
+            margin: 5px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #333;
+            position: relative;
+            font-size: 24px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+        }
+        .card.red {
+            color: red;
+        }
+        .card.black {
+            color: black;
+        }
+        .buttons {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 0 10px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .score {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        #message {
+            font-size: 24px;
+            font-weight: bold;
+            color: #d2691e;
+            min-height: 30px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Juego de Veintiuno</h1>
+        
+        <div class="cards-container">
+            <div class="hand">
+                <h2>Crupier</h2>
+                <div id="dealer-cards"></div>
+                <div class="score">Puntos: <span id="dealer-score">0</span></div>
+            </div>
+            
+            <div class="hand">
+                <h2>Jugador</h2>
+                <div id="player-cards"></div>
+                <div class="score">Puntos: <span id="player-score">0</span></div>
+            </div>
+        </div>
+        
+        <div id="message"></div>
+        
+        <div class="buttons">
+            <button id="new-game">Juego Nuevo</button>
+            <button id="hit" disabled>Pedir Carta</button>
+            <button id="stand" disabled>Parar</button>
+        </div>
+    </div>
+
+    <script>
+        // Variables del juego
+        const suits = ['♥', '♦', '♣', '♠'];
+        const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        let deck = [];
+        let playerHand = [];
+        let dealerHand = [];
+        let gameOver = false;
+
+        // Elementos del DOM
+        const dealerCardsEl = document.getElementById('dealer-cards');
+        const playerCardsEl = document.getElementById('player-cards');
+        const dealerScoreEl = document.getElementById('dealer-score');
+        const playerScoreEl = document.getElementById('player-score');
+        const messageEl = document.getElementById('message');
+        const newGameBtn = document.getElementById('new-game');
+        const hitBtn = document.getElementById('hit');
+        const standBtn = document.getElementById('stand');
+
+        // Inicializar el juego
+        newGameBtn.addEventListener('click', startGame);
+        hitBtn.addEventListener('click', hit);
+        standBtn.addEventListener('click', stand);
+
+        // Crear y barajar el mazo
+        function createDeck() {
+            deck = [];
+            for (let suit of suits) {
+                for (let value of values) {
+                    deck.push({ suit, value });
+                }
+            }
+            return shuffleDeck(deck);
+        }
+
+        // Barajar el mazo
+        function shuffleDeck(deck) {
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        }
+
+        // Iniciar nuevo juego
+        function startGame() {
+            deck = createDeck();
+            playerHand = [drawCard(), drawCard()];
+            dealerHand = [drawCard(), drawCard()];
+            gameOver = false;
+            
+            updateButtons();
+            updateDisplay();
+            
+            // Verificar si el jugador tiene blackjack inmediato
+            if (calculateScore(playerHand) === 21) {
+                gameOver = true;
+                dealerPlay();
+            }
+        }
+
+        // Tomar una carta del mazo
+        function drawCard() {
+            return deck.pop();
+        }
+
+        // Calcular el puntaje de una mano
+        function calculateScore(hand) {
+            let score = 0;
+            let hasAce = false;
+            
+            for (let card of hand) {
+                if (card.value === 'A') {
+                    hasAce = true;
+                    score += 11;
+                } else if (['K', 'Q', 'J'].includes(card.value)) {
+                    score += 10;
+                } else {
+                    score += parseInt(card.value);
+                }
+            }
+            
+            // Ajustar si hay Ases y el puntaje se pasa de 21
+            while (score > 21 && hasAce) {
+                score -= 10;
+                hasAce = false; // Solo podemos ajustar un As de 11 a 1
+            }
+            
+            return score;
+        }
+
+        // Pedir carta (jugador)
+        function hit() {
+            if (!gameOver) {
+                playerHand.push(drawCard());
+                updateDisplay();
+                
+                const playerScore = calculateScore(playerHand);
+                
+                if (playerScore > 21) {
+                    // Jugador se pasa de 21
+                    gameOver = true;
+                    messageEl.textContent = '¡Te pasaste de 21! Pierdes.';
+                    updateButtons();
+                } else if (playerScore === 21) {
+                    // Jugador tiene 21 exactos
+                    gameOver = true;
+                    dealerPlay();
+                }
+            }
+        }
+
+        // Plantarse (jugador)
+        function stand() {
+            if (!gameOver) {
+                gameOver = true;
+                dealerPlay();
+            }
+        }
+
+        // Turno del crupier
+        function dealerPlay() {
+            updateDisplay(true); // Mostrar todas las cartas del crupier
+            
+            let dealerScore = calculateScore(dealerHand);
+            
+            // El crupier debe pedir cartas hasta tener al menos 17
+            while (dealerScore < 17) {
+                dealerHand.push(drawCard());
+                dealerScore = calculateScore(dealerHand);
+                updateDisplay(true);
+            }
+            
+            determineWinner();
+        }
+
+        // Determinar el ganador
+        function determineWinner() {
+            const playerScore = calculateScore(playerHand);
+            const dealerScore = calculateScore(dealerHand);
+            
+            if (playerScore > 21) {
+                messageEl.textContent = '¡Te pasaste de 21! Pierdes.';
+            } else if (dealerScore > 21) {
+                messageEl.textContent = '¡El crupier se pasó! ¡Ganas!';
+            } else if (dealerScore > playerScore) {
+                messageEl.textContent = '¡El crupier gana!';
+            } else if (playerScore > dealerScore) {
+                messageEl.textContent = '¡Ganas!';
+            } else {
+                messageEl.textContent = '¡Empate!';
+            }
+        }
+
+        // Actualizar la visualización
+        function updateDisplay(showAllDealerCards = false) {
+            // Mostrar cartas del jugador
+            playerCardsEl.innerHTML = '';
+            playerHand.forEach(card => {
+                playerCardsEl.appendChild(createCardElement(card));
+            });
+            
+            // Mostrar cartas del crupier
+            dealerCardsEl.innerHTML = '';
+            if (showAllDealerCards) {
+                dealerHand.forEach(card => {
+                    dealerCardsEl.appendChild(createCardElement(card));
+                });
+            } else {
+                // Mostrar solo la primera carta del crupier (la otra boca abajo)
+                if (dealerHand.length > 0) {
+                    dealerCardsEl.appendChild(createCardElement(dealerHand[0]));
+                    dealerCardsEl.appendChild(createCardBackElement());
+                }
+            }
+            
+            // Actualizar puntajes
+            playerScoreEl.textContent = calculateScore(playerHand);
+            
+            if (showAllDealerCards) {
+                dealerScoreEl.textContent = calculateScore(dealerHand);
+            } else {
+                // Solo mostrar el valor de la primera carta del crupier
+                dealerScoreEl.textContent = dealerHand.length > 0 ? 
+                    getCardValue(dealerHand[0]) : '0';
+            }
+        }
+
+        // Crear elemento de carta
+        function createCardElement(card) {
+            const cardEl = document.createElement('div');
+            cardEl.className = `card ${card.suit === '♥' || card.suit === '♦' ? 'red' : 'black'}`;
+            cardEl.innerHTML = `
+                <div style="position: absolute; top: 5px; left: 5px;">${card.value}</div>
+                <div style="position: absolute; bottom: 5px; right: 5px;">${card.suit}</div>
+                <div style="font-size: 30px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">${card.suit}</div>
+            `;
+            return cardEl;
+        }
+
+        // Crear elemento de carta boca abajo
+        function createCardBackElement() {
+            const cardBack = document.createElement('div');
+            cardBack.className = 'card';
+            cardBack.style.background = 'linear-gradient(135deg, #8B0000, #00008B)';
+            cardBack.style.color = 'white';
+            cardBack.textContent = '?';
+            cardBack.style.fontSize = '40px';
+            cardBack.style.display = 'flex';
+            cardBack.style.alignItems = 'center';
+            cardBack.style.justifyContent = 'center';
+            return cardBack;
+        }
+
+        // Obtener valor de una carta
+        function getCardValue(card) {
+            if (card.value === 'A') return 11;
+            if (['K', 'Q', 'J'].includes(card.value)) return 10;
+            return parseInt(card.value);
+        }
+
+        // Actualizar estado de los botones
+        function updateButtons() {
+            hitBtn.disabled = gameOver;
+            standBtn.disabled = gameOver;
+        }
+    </script>
+</body>
+</html>
